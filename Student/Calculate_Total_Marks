@@ -1,0 +1,12 @@
+# Table marks has columns "id","subject","scores"
+# Calculate total marks of a student across all the subjects
+
+
+
+SELECT marks.id,marks.scores,marks.subject,y.total_scores
+FROM
+(SELECT id,sum(scores) as total_scores 
+FROM marks
+group by id)y
+LEFT JOIN marks 
+ON marks.id=y.id;
