@@ -1,1 +1,36 @@
-#placeholder
+Samantha interviews many candidates from different colleges using coding challenges and contests. Write a query to print the contest_id, hacker_id, name, and the sums of total_submissions, total_accepted_submissions, total_views, and total_unique_views for each contest sorted by contest_id. Exclude the contest from the result if all four sums are .
+
+Note: A specific contest can be used to screen candidates at more than one college, but each college only holds  screening contest.
+
+
+URL : https://www.hackerrank.com/challenges/interviews/problem
+
+
+SOLUTION
+
+SELECT a.contest_id, hacker_id, name, sum(tot_sub) as tot_sub, sum(acc_sub) as acc_sub, sum(tot_view) as tot_view, sum(uniq_view) as uniq_view
+FROM Contests d
+LEFT JOIN
+(SELECT b.contest_id, sum(tot_sub) as tot_sub, sum(acc_sub) as acc_sub, sum(tot_view) as tot_view, sum(uniq_view) as uniq_view
+FROM
+(SELECT contest_id, challenge_id
+FROM Colleges coll
+JOIN Challenges chal
+ON coll.college_id = chal.college_id
+GROUP BY contest_id, challenge_id) b
+left join
+(SELECT challenge_id,sum(total_views) as tot_view, sum(total_unique_views) as uniq_view
+FROM View_Stats
+GROUP BY challenge_id)x
+on b.challenge_id=x.challenge_id
+LEFT JOIN
+(SELECT challenge_id,sum(total_submissions) as tot_sub, sum(total_accepted_submissions) as acc_sub
+FROM Submission_Stats 
+GROUP BY challenge_id)y
+ON b.challenge_id = y.challenge_id
+GROUP BY b.contest_id
+)a
+ON a.contest_id=d.contest_id
+GROUP BY a.contest_id, hacker_id, name 
+having sum(tot_sub)+sum(acc_sub)+sum(tot_view)+sum(uniq_view) > 0
+Order by a.contest_id
