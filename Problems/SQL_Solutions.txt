@@ -1,0 +1,154 @@
+# SQL Question 1 
+
+1. Sales are reported across quarters for stores. There are 100 stores and 
+there are 4 quarters for each store (a total of 400 rows).
+Find out the difference in sales between the adjacent quarters of the same store (Q4-Q3, Q3-Q2, Q2-Q1)
+
+Solution
+
+select Store,
+max(case when Quarter = 2 then sales-prev_sales else Null end) as Q2Q1,
+max(case when Quarter = 3 then sales-prev_sales else Null end) as Q3Q2,
+max(case when Quarter = 4 then sales-prev_sales else Null end) as Q4Q3
+FROM
+(SELECT a.Store,b.Quarter,b.Sales as sales,a.Sales as prev_sales 
+FROM `sabermetrics-ai.MLB.sales` a
+INNER JOIN `sabermetrics-ai.MLB.sales` b
+on a.Store=b.Store and a.Quarter = b.Quarter - 1)x
+GROUP BY Store
+
+# Concise solution
+select Store,
+max(case when Quarter = 2 then Sales else 0 end)-max(case when Quarter = 1 then Sales else 0 end) as Q2Q1,
+max(case when Quarter = 3 then Sales else 0 end)-max(case when Quarter = 2 then Sales else 0 end) as Q3Q2,
+max(case when Quarter = 4 then Sales else 0 end)-max(case when Quarter = 3 then Sales else 0 end) as Q4Q3
+FROM `sabermetrics-ai.MLB.sales`
+GROUP BY Store
+
+# another solution using lead over partition by
+SELECT Store,
+max(case when Q=2 then QoQ else 0 end) as Q2Q1,
+max(case when Q=3 then QoQ else 0 end) as Q3Q2,
+max(case when Q=4 then QoQ else 0 end) as Q4Q3
+FROM
+(SELECT Store, Quarter+1 as Q, next_q_sales-Sales as QoQ
+FROM
+(SELECT 
+	Store,Quarter,Sales,
+	LEAD(Sales) OVER (
+		PARTITION BY Store ORDER BY Quarter asc
+	) next_q_sales
+FROM `sabermetrics-ai.MLB.sales`)x
+WHERE next_q_sales is not null)y
+GROUP BY Store
+
+Learning : max(case when) 
+
+
+
+# Find missing sequence
+
+SELECT a.Store, a.Quarter
+FROM
+(SELECT Store, Quarter
+FROM
+(SELECT Store FROM `sabermetrics-ai.MLB.hitter_missing_q` 
+GROUP BY Store)x
+JOIN
+(SELECT Quarter FROM `sabermetrics-ai.MLB.hitter_missing_q` 
+GROUP BY Quarter)y
+ON 1=1)a
+LEFT JOIN `sabermetrics-ai.MLB.hitter_missing_q` b
+ON a.Store=b.Store and a.Quarter=b.Quarter
+WHERE b.Quarter is null
+
+# Find which quarter the store is getting renovated
+
+Step 1 : Find missing flag
+SELECT a.Store, a.Quarter,
+CASE when b.Quarter is Null then 1 else 0 end as missing_flag
+FROM
+(SELECT Store, Quarter
+FROM
+(SELECT Store FROM `sabermetrics-ai.MLB.hitter_missing_q` 
+GROUP BY Store)x
+JOIN
+(SELECT Quarter FROM `sabermetrics-ai.MLB.hitter_missing_q` 
+GROUP BY Quarter)y
+ON 1=1)a
+LEFT JOIN `sabermetrics-ai.MLB.hitter_missing_q` b
+ON a.Store=b.Store and a.Quarter=b.Quarter
+
+Step 2 : Find store, quarter renovation started, quarter renovation ended
+
+SELECT Store,Quarter,Start_flag,end_flag
+FROM
+(SELECT Store,Quarter,
+case when ((prev_flag=0 or prev_flag is Null) and curr_flag=1) then 'start' else null end as Start_flag,
+case when (curr_flag=1 and (next_flag=0 or next_flag is Null)) then 'end' else null end as end_flag
+FROM
+(SELECT p.Store, p.Quarter,p.curr_flag, p.prev_flag, q.missing_flag as next_flag
+FROM
+(SELECT m.Store, m.Quarter, m.missing_flag as curr_flag, n.missing_flag as prev_flag
+FROM
+(SELECT a.Store, a.Quarter,
+CASE when b.Quarter is Null then 1 else 0 end as missing_flag
+FROM
+(SELECT Store, Quarter
+FROM
+(SELECT Store FROM `sabermetrics-ai.MLB.hitter_quota` 
+GROUP BY Store)x
+JOIN
+(SELECT Quarter FROM `sabermetrics-ai.MLB.hitter_quota` 
+GROUP BY Quarter)y
+ON 1=1)a
+LEFT JOIN `sabermetrics-ai.MLB.hitter_quota` b
+ON a.Store=b.Store and a.Quarter=b.Quarter)m
+LEFT JOIN
+(SELECT a.Store, a.Quarter,
+CASE when b.Quarter is Null then 1 else 0 end as missing_flag
+FROM
+(SELECT Store, Quarter
+FROM
+(SELECT Store FROM `sabermetrics-ai.MLB.hitter_quota` 
+GROUP BY Store)x
+LEFT JOIN
+(SELECT Quarter FROM `sabermetrics-ai.MLB.hitter_quota` 
+GROUP BY Quarter)y
+ON 1=1)a
+LEFT JOIN `sabermetrics-ai.MLB.hitter_quota` b
+ON a.Store=b.Store and a.Quarter=b.Quarter)n
+ON m.Store = n.Store and m.Quarter=n.Quarter + 1)p
+LEFT JOIN
+(SELECT a.Store, a.Quarter,
+CASE when b.Quarter is Null then 1 else 0 end as missing_flag
+FROM
+(SELECT Store, Quarter
+FROM
+(SELECT Store FROM `sabermetrics-ai.MLB.hitter_quota` 
+GROUP BY Store)x
+JOIN
+(SELECT Quarter FROM `sabermetrics-ai.MLB.hitter_quota` 
+GROUP BY Quarter)y
+ON 1=1)a
+LEFT JOIN `sabermetrics-ai.MLB.hitter_quota` b
+ON a.Store=b.Store and a.Quarter=b.Quarter)q
+ON p.Store=q.Store and p.Quarter = q.Quarter-1
+order by p.Store,p.Quarter)r)z
+WHERE Start_flag is not NULL or end_flag is not NULL
+
+
+Saved the above table as hitter_quota_interim, then continued
+
+
+
+SELECT Store, start_Q, min(end_Q) as end_Q
+FROM
+(SELECT a.Store, start_Q, end_Q
+FROM 
+(SELECT Store,Quarter as start_Q FROM `sabermetrics-ai.MLB.hitter_quota_interim` WHERE start_flag='start' )a
+LEFT JOIN (SELECT Store,Quarter as end_Q FROM `sabermetrics-ai.MLB.hitter_quota_interim` WHERE end_flag='end')b
+ON a.Store=b.Store and a.start_Q <= b.end_Q
+order by a.Store,start_Q, end_Q)z
+GROUP BY 1,2
+order by 1,2,3
