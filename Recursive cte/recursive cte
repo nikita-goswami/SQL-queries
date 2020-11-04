@@ -1,0 +1,57 @@
+# Find fourth generation
+
+
+with temp_loop as
+(select child, father, 1 lvl FROM father_child where child = 10
+union all
+select f.child, f.father, lvl+1 
+from temp_loop t
+INNER JOIN father_child f on t.father=f.child
+where lvl<4)
+
+SELECT father 
+FROM temp_loop
+WHERE lvl=4
+
+
+
+# Find last level manager (my query)
+
+/* Create a table called NAMES */
+CREATE TABLE stores(old_id integer , new_id integer);
+
+/* Create few records in this table */
+INSERT INTO stores VALUES(1,4);
+INSERT INTO stores VALUES(2,5);
+INSERT INTO stores VALUES(3,6);
+INSERT INTO stores VALUES(4,7);
+INSERT INTO stores VALUES(7,8);
+INSERT INTO stores VALUES(5,9);
+
+with temp_loop as
+( select old_id, new_id, 1 lvl 
+FROM stores 
+union all 
+select  t.old_id, s.new_id, lvl + 1 
+FROM temp_loop t
+INNER JOIN stores s on t.new_id=s.old_id)
+
+SELECT g.old_id, g.new_id, g.lvl
+FROM
+(SELECT new_id, max(lvl) as lvl
+FROM
+(SELECT d.old_id, d.new_id, d.lvl,
+CASE WHEN c.old_id=d.old_id and c.new_id=d.new_id then 0 else 1 end as to_be_considered_flag
+FROM temp_loop d
+LEFT JOIN 
+(SELECT a.old_id, a.new_id, a.lvl
+FROM temp_loop a
+INNER JOIN temp_loop b
+ON a.new_id=b.old_id)c
+ON c.old_id=d.old_id and c.new_id=d.new_id) e
+WHERE to_be_considered_flag = 1
+GROUP BY new_id) f
+INNER JOIN
+(SELECT old_id, new_id, lvl
+FROM temp_loop)g
+ON f.new_id=g.new_id and f.lvl=g.lvl
