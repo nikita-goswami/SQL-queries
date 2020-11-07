@@ -1,0 +1,83 @@
+# Customer Retention
+
+# Preparing dataset
+
+CREATE TABLE store_transaction AS
+SELECT cust_id,store_no,sales_amt,new_date, strftime('%w',new_date) as day_of_week, CAST(((julianday(new_date)-julianday('2017-01-01')+7)/7) AS integer) as week_finder
+FROM
+(SELECT cust_id,store_no,sales_amt,date(year||'-'||new_month||'-'||new_day) as new_date
+FROM
+(SELECT cust_id,store_no,sales_amt,month,day,year,
+CASE WHEN length(month)=1 then '0'||month else month end as new_month,
+CASE WHEN length(day)=1 then '0'||day else day end as new_day
+FROM store_sales)x)
+
+
+# Static query for retention rate for a week_of_year
+
+SELECT m.store_no,tot_retended_cust,tot_old_cust,  CAST(tot_retended_cust as float)/CAST(tot_old_cust as float) as retention_rate
+FROM
+(SELECT store_no,count(*) as tot_retended_cust
+FROM
+(SELECT x.cust_id, x.store_no, y.cust_id as y_cust_id, y.store_no as y_store_no
+FROM
+(SELECT cust_id, store_no FROM store_transaction
+WHERE week_finder >=40 and week_finder <= 92
+GROUP BY 1,2)x
+LEFT JOIN
+(SELECT cust_id,store_no FROM store_transaction
+WHERE week_finder>=92 and week_finder<=105
+GROUP BY 1,2)y
+ON x.cust_id=y.cust_id and x.store_no=y.store_no)z
+WHERE y_cust_id is not NULL and y_store_no is not NULL
+GROUP BY 1)m
+INNER JOIN
+(SELECT store_no, count(*) as tot_old_cust
+FROM
+(SELECT cust_id, store_no FROM store_transaction
+WHERE week_finder >=40 and week_finder <= 92
+GROUP BY 1,2)x
+GROUP BY 1)n
+ON m.store_no=n.store_no
+
+
+
+
+
+#Tables created for dynamic moving window method of computing week level retention rate
+
+CREATE TABLE week_struct AS
+SELECT week_no as nw_end, week_no - 12 as nw_start, week_no - 65 as ow_start, week_no - 13 as ow_end  FROM week
+
+CREATE TABLE denom_base AS
+SELECT cust_id,b.ow_end as week
+FROM
+(SELECT cust_id,week_finder as week FROM store_transaction) a
+INNER JOIN week_struct b
+ON a.week<=ow_end and a.week>=ow_start
+
+CREATE table denom AS
+SELECT week, count(*) as total_cnt FROM denom_base
+GROUP BY 1
+
+CREATE TABLE post_base AS
+SELECT cust_id,b.ow_end as week
+FROM
+(SELECT cust_id,week_finder as week FROM store_transaction) a
+INNER JOIN week_struct b
+ON a.week<=nw_end and a.week>=nw_start
+GROUP BY 1,2
+
+CREATE TABLE numerator AS
+SELECT week, count(*) as numerator
+FROM
+(SELECT x.cust_id, x.week
+FROM denom_base x
+INNER JOIN post_base y
+ON x.cust_id=y.cust_id and x.week=y.week)z
+GROUP BY 1
+
+
+SELECT numerator/total_cnt FROM numerator
+INNER JOIN denom
+ON denom.week=numerator.week
