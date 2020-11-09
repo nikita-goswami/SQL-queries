@@ -1,0 +1,64 @@
+ Question
+ 
+ Table 1 : sales_info
+ Store_no, visit_no, visit_date, cust_id, scan_id, quantity, sales
+ 
+ Table 2 : category_info
+ scan_id, cat_no
+ 
+ Find the biggest category with respect to number of distinct items sold for every store, and also based on sales amount, and based on distinct customer reach
+ 
+ 1. Biggest category wrt Number of distinct items sold
+ 
+ 
+ SELECT store_no, cat_no
+ FROM
+ (SELECT store_no, cat_no, 
+ ROW_NUMBER() OVER (PARTITION BY store_no ORDER BY distinct_item)cat_rank
+ FROM
+ (SELECT store_no, cat_no, count(*) as distinct_item
+ FROM
+ (SELECT store_no, cat_no, scan_id 
+ FROM sales_info s
+ INNER JOIN category_info c
+ ON s.scan_id=c.scan_id
+ WHERE sales > 0
+ GROUP BY 1,2,3)x
+ GROUP BY 1,2)y)z
+ WHERE cat_rank = 1
+ 
+ 
+ 2. Sales amount
+ 
+ SELECT store_no, cat_no
+ FROM
+ (SELECT store_no, cat_no,
+ ROW_NUMBER() OVER (PARTITION BY store_no ORDER BY cat_sales)cat_rank
+ FROM
+ (SELECT store_no, cat_no, sum(sales) as cat_sales
+ FROM sales_info s
+ INNER JOIN category_info c
+ ON s.scan_id=c.scan_id
+ GROUP BY 1,2)x)y
+ WHERE cat_rank=1
+ 
+ 3. Biggest category wrt distinct customers
+ 
+ SELECT store_no, cat_no
+ FROM
+ (SELECT store_no, cat_no,
+ ROW_NUMBER() OVER (PARTITION BY store_no ORDER BY distinct_cust)cat_rank
+ FROM
+ (SELECT store_no, cat_no, count(*) as distinct_cust
+ FROM
+ (SELECT store_no, cat_no, cust_id, sum(sales) as sum_sales 
+ FROM sales_info s
+ INNER JOIN category_info c
+ ON s.scan_id=c.scan_id
+ WHERE sales > 0
+ GROUP BY 1,2,3
+ HAVING sum_sales>0)x
+ GROUP BY 1,2)y)z
+ WHERE cat_rank=1
+ 
+ 
