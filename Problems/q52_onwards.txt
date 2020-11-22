@@ -1,0 +1,85 @@
+# Q52 : How many customers have more than a year of relationship with the company?
+
+SELECT customer_name, max(interaction_timestamp) as latest_interaction, min(interaction_timestamp) as oldest_interaction, DATE_DIFF(max(interaction_timestamp), min(interaction_timestamp), DAY) as diff FROM `sabermetrics-ai.MLB.hitter_interact`
+GROUP BY 1
+HAVING diff>360
+
+
+# Q53 : Flag items sold at price greater than average price across years
+
+# with inner query
+SELECT product_no,selling_price, 
+CASE WHEN selling_price>avg_price then 1 else 0 end as flag_greater_than_avg
+FROM
+(SELECT a.product_no, selling_price, avg_price
+FROM `covid-19-maverick-ai.jhu_pipeline.test_sql_14_prod` a
+LEFT JOIN
+(SELECT product_no, avg(selling_price) as avg_price FROM `covid-19-maverick-ai.jhu_pipeline.test_sql_14_prod`
+GROUP BY 1)b
+ON a.product_no=b.product_no)c
+
+# without inner query
+SELECT product_no,selling_price, 
+CASE WHEN selling_price>avg(selling_price) over (partition by product_no) then 1 else 0 end as flag_greater_than_avg
+FROM `covid-19-maverick-ai.jhu_pipeline.test_sql_14_prod`
+
+
+# Q54 : Provide the list of customers who: Have never interacted with the company in the last 6 months but have interacted at least once in the past one year.
+
+SELECT customer_id FROM `covid-19-maverick-ai.jhu_pipeline.test_sql_5_54`
+WHERE DATE_DIFF(current_date(),interaction_timestamp,day) > 180 and DATE_DIFF(current_date(),interaction_timestamp,day) < 720 
+GROUP BY 1
+
+# Q55 : For customers who made more than 2 transactions, whats the difference between first and second transactions
+
+SELECT a.customer_id, gap
+FROM
+(SELECT customer_id, gap, prev_timestamp
+FROM
+(SELECT customer_id, interaction_timestamp,  
+lag(interaction_timestamp,1) over (partition by customer_id order by interaction_timestamp) as prev_timestamp, 
+date_diff(interaction_timestamp,lag(interaction_timestamp,1) over (partition by customer_id order by interaction_timestamp),day) as gap
+FROM `covid-19-maverick-ai.jhu_pipeline.test_sql_5_54`)x
+WHERE prev_timestamp is not NULL and gap>0)a
+INNER JOIN
+(SELECT customer_id, min(interaction_timestamp) as min_timestamp FROM `covid-19-maverick-ai.jhu_pipeline.test_sql_5_54`
+GROUP BY 1)b
+ON a.customer_id=b.customer_id
+WHERE prev_timestamp = min_timestamp
+ORDER BY 1
+
+# Another solution for Q54
+select customer_id, no_of_days from
+(SELECT customer_id, interaction_timestamp, date_diff(lead(interaction_timestamp,1) over(partition by customer_id order by interaction_timestamp),interaction_timestamp, day) no_of_days, 
+row_number() over (partition by customer_id order by interaction_timestamp) as no_of_interactions
+from `covid-19-maverick-ai.jhu_pipeline.test_sql_5_54`
+where customer_id in (select customer_id
+FROM `covid-19-maverick-ai.jhu_pipeline.test_sql_5_54`
+group by 1
+having count(*) > 1)
+order by 1,2)
+where no_of_interactions = 1
+
+
+# Q 58 : For customers who made more than 2 transactions, what is the average gap between 2 transactions?
+
+SELECT customer_id, avg(diff_day) as avg_diff_day
+FROM
+(SELECT customer_id, 
+date_diff(interaction_timestamp,lag(interaction_timestamp,1) over (partition by customer_id order by interaction_timestamp),day) as diff_day
+FROM `covid-19-maverick-ai.jhu_pipeline.test_sql_5_54`)
+WHERE diff_day is not NULL
+GROUP BY 1
+
+# Another way
+select customer_id, avg(no_of_days) from
+(SELECT customer_id, interaction_timestamp, 
+date_diff(lead(interaction_timestamp,1) over(partition by customer_id order by interaction_timestamp),interaction_timestamp, day) no_of_days,
+row_number() over (partition by customer_id order by interaction_timestamp) as no_of_interactions
+from `covid-19-maverick-ai.jhu_pipeline.test_sql_5_54`
+where customer_id in (select customer_id
+FROM `covid-19-maverick-ai.jhu_pipeline.test_sql_5_54`
+group by 1
+having count(*) > 1)
+order by 1,2)
+group by 1
