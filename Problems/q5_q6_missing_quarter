@@ -1,0 +1,37 @@
+# 160 questions sheet
+
+### Q6. Find max gap of missing quarter
+
+## Solution : 
+	SELECT store, start_qtr, end_qtr FROM
+	(SELECT *, RANK() OVER (PARTITION BY store ORDER BY diff_qtr desc)my_rank
+	FROM
+	(SELECT store,quarter as end_qtr, lag(quarter,1) OVER (partition by store order by quarter) as start_qtr, quarter- 
+	lag(quarter,1) OVER (partition by store order by quarter) as diff_qtr
+	FROM
+	(SELECT * FROM `sabermetrics-ai.MLB.hitter_consec_qtr`
+	UNION ALL 
+	SELECT distinct(store) as store, 0 as quarter, 0 as sales FROM `sabermetrics-ai.MLB.hitter_consec_qtr`
+	UNION ALL
+	SELECT distinct(store) as store, 31 as quarter, 0 as sales FROM `sabermetrics-ai.MLB.hitter_consec_qtr`
+	ORDER BY store,quarter)a))b
+	WHERE my_rank = 1
+	
+	
+	
+### Q5. Find start and end of missing quarter sequence for each store
+
+## Solution : 
+	SELECT store, missing_start_qtr + 1 as missing_start_qtr, missing_end_qtr - 1 as missing_end_qtr
+	FROM
+	(SELECT store,quarter as missing_end_qtr, lag(quarter,1) OVER (partition by store order by quarter) as missing_start_qtr, quarter- 
+	lag(quarter,1) OVER (partition by store order by quarter) as diff_qtr
+	FROM
+	(SELECT * FROM `sabermetrics-ai.MLB.hitter_consec_qtr`
+	UNION ALL 
+	SELECT distinct(store) as store, 0 as quarter, 0 as sales FROM `sabermetrics-ai.MLB.hitter_consec_qtr`
+	UNION ALL
+	SELECT distinct(store) as store, 31 as quarter, 0 as sales FROM `sabermetrics-ai.MLB.hitter_consec_qtr`
+	ORDER BY store,quarter)a)
+	WHERE diff_qtr>1
+	ORDER BY 1,2
