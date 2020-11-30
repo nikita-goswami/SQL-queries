@@ -1,0 +1,77 @@
+
+Table : holiday_base
+store_no, visit_no, visit_date (timestamp), scan_id, event1_flag, event2_flag, price
+
+event1_flag is b/w 8PM and 10PM on 29th Nov
+event2_flag is b/w 10PM and 12AM on 29th Nov
+
+Question : What is the proportion of promotional baskets to overall baskets during event1
+
+
+Assumption : 
+# Event 1 flag is for all the items which are in proportion during event 1
+# Multiple event 1 promotion items can be in 1 basket and they should be counted as 1 entity
+# visit_no are unique across all stores
+
+
+SELECT 
+sum(*)/ count(*)  as proportion_promotional_basket_event1
+(SELECT store_no,visit_no,visit_date,
+max(CASE WHEN event1_flag=1 then 1 else 0 end) as max_event1_flag
+FROM holiday_base
+WHERE date(visit_date)= '11/28/2020' and hour(visit_date)>=20 and hour(visit_date)<=22
+GROUP BY 1,2,3)x
+
+Question : What is the sales contribution of promotional items to basket value during event2
+
+
+SELECT avg(sales_cn_promotional_basket_event2_visit_level) as avg_sales_cn_promotional_basket_event2
+FROM
+(SELECT store_no,visit_no,visit_date,
+(sum(CASE WHEN event1_flag=2 then price else 0))/sum(price) as sales_cn_promotional_basket_event2_visit_level
+FROM holiday_base
+WHERE date(visit_date)= '11/28/2020' and hour(visit_date)>=22 and hour(visit_date)<=23
+GROUP BY 1,2,3)x
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT 
+(sum(CASE WHEN event1_flag=2 then price else 0))/sum(price) as sales_cn_promotional_basket_event2
+FROM holiday_base
+WHERE date(visit_date)= '11/28/2020' and hour(visit_date)>=22 and hour(visit_date)<=23
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Old
+SELECT store_no, visit_no,
+(count(CASE WHEN event1_flag=1 then 1 else 0))/count(*) as proportion_promotional_basket_event1
+FROM holiday_base
+WHERE date(visit_date)= 11/28/2020 and time(visit_date)>=8PM and time(visit_date)<=10PM
+GROUP BY 1,2
