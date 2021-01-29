@@ -1,0 +1,23 @@
+Table : 
+sales_info : cust_id, scan_id, date, sales
+dept_mapping : scan_id, dept_id
+
+# Customers who purchased in dept 72 but not in dept 46. 
+
+select store_72.cust_id
+from
+(select cust_id
+from sales_info s
+inner join dept_mapping d
+on s.scan_id = d.scan_id
+where store_no = 3290 and date>01/01/2020 and date<=31/12/2020 and dept_id = 72
+group by 1)store_72
+left join
+(select cust_id
+from sales_info s
+inner join dept_mapping d
+on s.scan_id = d.scan_id
+where store_no = 3290 and date>01/01/2020 and date<=31/12/2020 and dept_id = 46
+group by 1)store_46
+on store_72.cust_id = store_46.cust_id
+where store_46.cust_id is null

@@ -1,0 +1,50 @@
+Table : 
+sales_info : cust_id, scan_id, date, store_no, sales
+dept_mapping : scan_id, dept_id, 
+
+# Dept level sales contribution and customer penetration
+
+
+
+select c_pen.dept_id, dept_penetration, sales_contribution
+from
+(select num.dept_id , dept_count/overall_coubnt as dept_penetration
+from
+(select dept_id, count(*) as dept_count
+from
+(select dept_id,cust_id
+from 
+(
+(select cust_id, s.scan_id, date, dept_id
+from sales_info s
+inner join dept_mapping d
+on s.scan_id = d.scan_id
+where date>01/01/2019 and date<=31/12/2019)a)
+group by 1,2)b
+group by 1)num
+inner join
+(select count(*) as overall_count
+from
+(select cust_id
+from 
+(select cust_id, s.scan_id, date, dept_id
+from sales_info s
+inner join dept_mapping d
+on s.scan_id = d.scan_id
+where date>01/01/2019 and date<=31/12/2019)x
+group by 1)y) denom
+on 1=1)c_pen
+inner join
+(select dept_id, dept_sales/overall_sales as sales_contribution
+from 
+(select dept_id, sum(sales) as dept_sales
+from sales_info s
+inner join dept_mapping d
+on s.scan_id = d.scan_id
+where date>01/01/2019 and date<=31/12/2019
+group by 1)num
+inner join
+(select sum(sales) as overall _sales
+from sales_info)denom
+on 1=1)s_contribution
+on c_pen.dept_id=s_contribution.dept_id

@@ -1,0 +1,50 @@
+Table : 
+sales_info : cust_id, scan_id, date
+dept_mapping : scan_id, dept_id
+
+# customer penetration code
+
+select num.dept_id, dept_count/overall_coubnt as dept_penetration
+from
+(select dept_id, count(*) as dept_count
+from
+(select dept_id,cust_id
+from 
+(
+(select cust_id, s.scan_id, date, dept_id
+from sales_info s
+inner join dept_mapping d
+on s.scan_id = d.scan_id
+where date>01/01/2019 and date<=31/12/2019)a)
+group by 1,2)b
+group by 1)num
+inner join
+(select count(*) as overall_count
+from
+(select cust_id
+from 
+(select cust_id, s.scan_id, date, dept_id
+from sales_info s
+inner join dept_mapping d
+on s.scan_id = d.scan_id
+where date>01/01/2019 and date<=31/12/2019)x
+group by 1)y) denom
+on 1=1
+
+
+######################################################################################################
+denom
+# 5000
+
+num
+# 1, 500
+# 2, 680
+
+cross join result
+# 1, 500, 5000
+# 2, 680, 5000
+
+final result 
+# 1, 500/5000
+# 2, 680/5000
+##########################################################################################################
