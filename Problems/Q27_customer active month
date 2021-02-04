@@ -1,0 +1,31 @@
+# Question 27 : Customer active rate per month
+# Order values are provided for 100 stores and the customers transacting from each store. 
+# The time frame given is for the whole year of 2018 (12 months).Determine the customer active rates across months. 
+# Example customer active rate for Jan = Customers who transacted in Jan, and also in the next 11 months. 
+# Active rate for Feb = Customers who transacted in Feb and also in the next 10 months and so on.
+
+
+Table : orders
+store_no, cust_id, trans_date, amount
+
+# Filter for year 2018 and find the month of purchase
+with u_orders as 
+(select cust_id, month(trans_date) as month
+from orders
+where trans_date<=31/12/2018 and trans_date>=01/01/2018)
+
+
+# Self join to find all the months a customer was active in. If the current month + count of months customer is active in future add upto 12 then this customer should be counted for the given month
+select cust_id, count(*) as active_customers
+from
+(select month, cust_id, cnt+month as total
+from
+(select month,cust_id, count(*) as cnt
+FROM
+(select a.month as month,a.cust_id,b.month as b_month
+from u_orders a 
+inner join u_orders b
+on a.cust_id=b.cust_id and a.month<b.month
+group by 1,2,3)x
+group by 1,2)y)z
+where total = 12
