@@ -1,0 +1,16 @@
+# Questions
+# Order values are provided for 100 stores and the customers transacting from each store. 
+# The time frame given is for the whole year of 2018 (12 months). Determine the loyal customers from the data. 
+# A customer is said to be loyal if he makes transactions for 3 consecutive months. 
+# Example Customer 123 is loyal if he transacts in Jan, Feb and Mar. Customer 456 is not loyal even if he makes transactions in Jan, Mar, May, Jul, Sep, Nov.
+
+
+# Table : Orders
+# cust_id, month of shopping
+
+select cust_id
+from
+(select cust_id, month -
+lag(month,2) over (partition by cust_id, order by month) as diff_month
+from Orders)
+where diff_month = 2
