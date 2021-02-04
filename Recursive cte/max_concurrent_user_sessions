@@ -1,0 +1,50 @@
+# Question
+# Assume you are given a table user sessions (session_id, start_time, end_time).
+# A session is considered to be concurrent with another user’s session if they overlap. 
+# Write a query to obtain the user session that is concurrent with the largest number of other user sessions.
+
+# Dummy Table 
+
+session_id	start_time	end_time
+1	5/10/2019	5/20/2019
+2	4/30/2019	5/15/2019
+3	5/10/2019	5/12/2019
+
+# Solution
+
+with temp_loop as
+(
+select '_'||a.session_id||'_'||b.session_id as session_id, max(a.start_time,b.start_time) as start_time, min(a.end_time,b.end_time) as end_time, 2 cnt
+FROM u_session a INNER JOIN u_session b
+ON a.end_time >= b.start_time and b.end_time >= a.start_time and a.session_id not like '%'||b.session_id||'%' and a.session_id>b.session_id
+
+union all
+
+select t.session_id||'_'||c.session_id||'_' as session_id, max(t.start_time,c.start_time) as start_time, min(t.end_time,c.end_time) as end_time, cnt+1 
+from temp_loop t INNER JOIN u_session c 
+ON t.end_time >= c.start_time and c.end_time >= t.start_time and t.session_id not like '%'||c.session_id||'%' 
+)
+
+SELECT session_id,start_time,end_time,x.cnt
+FROM temp_loop x
+INNER JOIN
+(SELECT max(cnt) as cnt
+from temp_loop) y
+ON x.cnt=y.cnt
+
+# Result 
+session_id, start_time, end_time, cnt
+_2_1_3_	5/10/2019	5/12/2019	3
+_3_1_2_	5/10/2019	5/12/2019	3
+_3_2_1_	5/10/2019	5/12/2019	3
+
+# Approach
+# Start query
+# The overlap time would lie between max(a.start_time,b.start_time) and min(a.end_time,b.end_time)
+# Concat all the session id being joined
+# TO remove duplicates the condition a.session_id>b.session_id has been put
+
+# recursive query
+# Add +1 to cnt
+# Keep everything same
+# Extra condition to stop same sessions from joining again : t.session_id not like '%'||c.session_id||'%' 
