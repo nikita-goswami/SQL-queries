@@ -1,0 +1,22 @@
+
+# 2 ways to calculate rolling sum
+
+Table : rolling_sum
+app_id,date,usage_h (usage_hours)
+
+Q. Find 7 day rolling sum of usage hours per app_id,date
+
+# using window function using frame
+
+SELECT app_id,Date,
+sum(usage_h) over (partition by app_id order by Date  ROWS between 6 preceding  and current row) as rolling
+FROM rolling_sum
+group by 1,2
+
+
+# using self join
+
+select b.app_id,b.Date, sum(a.usage_h) as summation
+from rolling_sum a inner join rolling_sum b
+on b.Date - a.Date  BETWEEN 0 and 6 and a.app_id=b.app_id
+group by 1,2
